@@ -1,0 +1,187 @@
+# веб-сервер
+HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>График температуры</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial; }
+        #graph { width: 100%; height: 60vh; }
+        .controls { margin-bottom: 20px; padding: 10px; background: #f0f0f0; border-radius: 10px; }
+        select, button { padding: 10px; margin: 5px; font-size: 16px; }
+        .status { margin-top: 10px; padding: 10px; border-radius: 5px; }
+        .normal { background: #44ff44; color: black; }
+        .warning { background: #ff8800; color: white; }
+        .temp-display {
+            text-align: center;
+            font-size: 36px;
+            margin: 10px 0;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+            z-index: 1000;
+            text-align: center;
+        }
+        .modal-content {
+            margin-top: 20%;
+        }
+        .modal-text {
+            font-size: 48px;
+            color: red;
+            font-weight: bold;
+            margin: 20px;
+        }
+        .modal-temp {
+            font-size: 72px;
+            color: red;
+            font-weight: bold;
+        }
+        .modal-button {
+            margin-top: 50px;
+            padding: 15px 30px;
+            font-size: 20px;
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <h3>Мониторинг температуры серверной</h3>
+        <select id="deviceSelect">
+            <option>Загрузка списка устройств...</option>
+        </select>
+        <button onclick="startMonitor()">Запустить мониторинг</button>
+        <button onclick="stopMonitor()">Остановить</button>
+        <div id="status" class="status normal">Готов к работе</div>
+        <div id="tempDisplay" class="temp-display" style="background:#cccccc;">Температура: --°C</div>
+    </div>
+    <div id="graph"></div>
+    
+    <div id="warningModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-text">ПЕРЕГРЕВ СЕРВЕРНОЙ!</div>
+            <div class="modal-text">Температура превысила 28°C</div>
+            <div class="modal-temp" id="warningTemp">--°C</div>
+            <button class="modal-button" onclick="closeWarning()">ПОНЯЛ, ПРИНИМАЮ МЕРЫ</button>
+        </div>
+    </div>
+    
+    <script>
+        let updateInterval = null;
+        let warningShown = false;
+        
+        async function loadDevices() {
+            const response = await fetch('/devices');
+            const devices = await response.json();
+            const select = document.getElementById('deviceSelect');
+            select.innerHTML = '';
+            for (let i = 0; i < devices.length; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = devices[i];
+                select.appendChild(option);
+            }
+        }
+        
+        function showWarning(temp) {
+            if (!warningShown) {
+                warningShown = true;
+                document.getElementById('warningTemp').innerHTML = temp.toFixed(2) + '°C';
+                document.getElementById('warningModal').style.display = 'block';
+            }
+        }
+        
+        function closeWarning() {
+            document.getElementById('warningModal').style.display = 'none';
+            warningShown = false;
+        }
+        
+        async function startMonitor() {
+            const select = document.getElementById('deviceSelect');
+            const index = select.value;
+            const response = await fetch('/start?index=' + index);
+            const result = await response.json();
+            document.getElementById('status').innerHTML = result.message;
+            
+            if (updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(loadData, 1000);
+        }
+        
+        async function stopMonitor() {
+            const response = await fetch('/stop');
+            const result = await response.json();
+            document.getElementById('status').innerHTML = result.message;
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+        }
+        
+        async function loadData() {
+            const response = await fetch('/data');
+            const data = await response.json();
+            
+            if (data.temps && data.temps.length > 0) {
+                const currentTemp = data.temps[data.temps.length - 1];
+                const tempDisplay = document.getElementById('tempDisplay');
+                
+                tempDisplay.innerHTML = 'Текущая температура: ' + currentTemp.toFixed(2) + '°C';
+                
+                if (currentTemp > 28) {
+                    tempDisplay.style.background = '#ff0000';
+                    tempDisplay.style.color = 'white';
+                    document.getElementById('status').innerHTML = 'ВНИМАНИЕ! Температура ' + currentTemp.toFixed(2) + '°C превысила 28°C!';
+                    document.getElementById('status').className = 'status warning';
+                    showWarning(currentTemp);
+                } else {
+                    tempDisplay.style.background = '#44ff44';
+                    tempDisplay.style.color = 'black';
+                    document.getElementById('status').innerHTML = 'Температура в норме: ' + currentTemp.toFixed(2) + '°C';
+                    document.getElementById('status').className = 'status normal';
+                    warningShown = false;
+                }
+                
+                const x = data.times;
+                const y = data.temps;
+                
+                Plotly.newPlot('graph', [{
+                    x: x,
+                    y: y,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Температура',
+                    line: { color: 'red', width: 2 },
+                    marker: { size: 4 }
+                }], {
+                    title: 'Мониторинг температуры (ODTEMP-1, 1 sec)',
+                    xaxis: { title: 'Время' },
+                    yaxis: { title: 'Температура (°C)', range: [20, 35] },
+                    shapes: [{
+                        type: 'line',
+                        x0: x[0],
+                        x1: x[x.length-1],
+                        y0: 28,
+                        y1: 28,
+                        line: { color: 'red', width: 2, dash: 'dash' }
+                    }]
+                });
+            }
+        }
+        
+        loadDevices();
+    </script>
+</body>
+</html>'''
