@@ -29,15 +29,15 @@ SENSOR_STATES = {
     3: "INTERROR",
     4: "CUSTOM",
 }
-load_dotenv()
+load_dotenv("data.env")
 
 # константы для почты
 SMTP_SERVER = os.environ.get("SMTP_SERVER")
-SMTP_PORT = os.environ.get("SMTP_PORT")
+SMTP_PORT = int(os.environ.get("SMTP_PORT",587))
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD")
 RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
-TEMP_THRESHOLD = os.environ.get("TEMP_THRESHOLD")
+TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD",28.0))
 
 # глобальные переменные
 current_temperature = 0.0
