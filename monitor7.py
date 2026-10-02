@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 import os
 from dotenv import load_dotenv
 import state
+import database
 
 # константы_для_датчика
 OD_VID = 0x0483
@@ -167,6 +168,7 @@ def read_sensor_loop():
 
                         state.temperature_history.append(temp)
                         state.time_history.append(datetime.datetime.now().strftime("%H:%M:%S"))
+                        database.log_temperature(temp)
 
                         if temp > TEMP_THRESHOLD:
                             print(f"[{now_str()}] ПЕРЕГРЕВ! {temp:.1f}°C")
@@ -202,5 +204,6 @@ def read_sensor_loop():
 
 # запуск
 if __name__ == "__main__":
+    database.init_db()
     from web_server import start_server
     start_server(5003)
