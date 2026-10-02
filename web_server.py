@@ -3,7 +3,6 @@ import socketserver
 import json
 import threading
 import webbrowser
-
 import state
 from monitor7 import read_sensor_loop
 
@@ -59,12 +58,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-
-def start_server(port=5003):
+def open_browser(port):
     webbrowser.open(f'http://localhost:{port}')
+def start_server(port=5003):
     print(f"Сервер запущен на http://localhost:{port}")
     print("Нажмите Ctrl+C для остановки")
     print("Нажмите кнопку 'Запустить мониторинг' для начала сбора данных")
+
+    threading.Timer(1.0, open_browser, args=[port]).start()
 
     with socketserver.TCPServer(("", port), Handler) as httpd:
         try:
