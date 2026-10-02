@@ -5,7 +5,7 @@ import threading
 import webbrowser
 import state
 from monitor7 import read_sensor_loop
-
+from logger import logger
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -60,10 +60,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 def open_browser(port):
     webbrowser.open(f'http://localhost:{port}')
+    
+
 def start_server(port=5003):
-    print(f"Сервер запущен на http://localhost:{port}")
-    print("Нажмите Ctrl+C для остановки")
-    print("Нажмите кнопку 'Запустить мониторинг' для начала сбора данных")
+    logger.info(f"Сервер запущен на http://localhost:{port}")
+    logger.info("Нажмите Ctrl+C для остановки")
+    logger.info("Нажмите кнопку 'Запустить мониторинг' для начала сбора данных")
 
     threading.Timer(1.0, open_browser, args=[port]).start()
 
@@ -71,6 +73,6 @@ def start_server(port=5003):
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\nОстановка...")
+            logger.info("Остановка...")
             state.monitor_active = False
             httpd.shutdown()

@@ -9,6 +9,7 @@ import os
 from dotenv import load_dotenv
 import state
 import database
+from logger import logger
 
 # константы_для_датчика
 OD_VID = 0x0483
@@ -84,7 +85,7 @@ def open_device():
         dev = hid.Device(vid=OD_VID, pid=OD_IOT_PID)
         return dev
     except Exception as e:
-        print(f"Ошибка открытия устройства: {e}")
+        logger.error(f"Ошибка открытия устройства: {e}")
         return None
 
 
@@ -123,10 +124,10 @@ def send_email_alert(temp):
             server.send_message(msg)
 
         state.alert_sent = True
-        print(f"[{now_str()}] Письмо отправлено на {RECEIVER_EMAIL}")
+        logger.info(f"Письмо отправлено на {RECEIVER_EMAIL}")
 
     except Exception as e:
-        print(f"[{now_str()}] Ошибка отправки письма: {e}")
+        logger.error(f"Ошибка отправки письма: {e}")
 
 
 # поток чтения для датчика
@@ -135,18 +136,18 @@ def read_sensor_loop():
     devices = available_devices()
 
     if not devices:
-        print("Устройства не найдены")
+        logger.warning("Устройства не найдены")
         return
 
     device_info = choose_device(devices)
-    print(f"Открываем устройство: {device_info['device_type']}")
+    logger.info(f"Открываем устройство: {device_info['device_type']}")
     dev = open_device()
     if not dev:
-        print("Не удалось открыть устройство")
+        logger.error("Не удалось открыть устройство")
         return
 
     last_data_time = time.time()
-    print("Мониторинг запущен")
+    logger.info("Мониторинг запущен")
 
     while state.monitor_active:
         try:
@@ -171,7 +172,7 @@ def read_sensor_loop():
                         database.log_temperature(temp)
 
                         if temp > TEMP_THRESHOLD:
-                            print(f"[{now_str()}] ПЕРЕГРЕВ! {temp:.1f}°C")
+                            logger.warning(f"ПЕРЕГРЕВ! {temp:.1f}°C")
                             send_email_alert(temp)
                         else:
                             state.alert_sent = False
@@ -179,27 +180,27 @@ def read_sensor_loop():
                 elif report_id == HID_EVENT_REPORT_ID:
                     if payload:
                         sensor_state = SENSOR_STATES.get(payload[0], f"UNKNOWN({payload[0]})")
-                        print(f"[{now_str()}] Состояние сенсора: {sensor_state}")
+                        logger.info(f"Состояние сенсора: {sensor_state}")
 
                 elif report_id == HID_FW_REPORT_ID:
                     if payload:
                         length = payload[0]
                         fw = payload[1:1 + length].decode("latin1", errors="replace")
-                        print(f"[{now_str()}] Версия прошивки: {fw}")
+                        logger.info(f"Версия прошивки: {fw}")
 
             if (time.time() - last_data_time) > 10.0:
-                print(f"[{now_str()}] Устройство не отвечает более 10 секунд")
+                logger.error("Устройство не отвечает более 10 секунд")
                 break
 
         except IOError as e:
-            print(f"[{now_str()}] Ошибка чтения: {e}")
+            logger.error(f"Ошибка чтения: {e}")
             time.sleep(0.5)
         except Exception as e:
-            print(f"[{now_str()}] Ошибка: {e}")
+            logger.error(f"Ошибка: {e}")
             time.sleep(0.5)
 
     dev.close()
-    print("Датчик отключен")
+    logger.info("Датчик отключен")
 
 
 # запуск
