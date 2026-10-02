@@ -2,19 +2,14 @@ import datetime
 import hid
 import re
 import time
-from collections import deque
-import http.server
-import socketserver
-import json
-import webbrowser
-import threading
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 from dotenv import load_dotenv
+import state
 
-# константы для датчика
+# константы_для_датчика
 OD_VID = 0x0483
 OD_IOT_PID = 0xA26A
 HID_DATA_REPORT_ID = 1
@@ -33,19 +28,11 @@ load_dotenv("data.env")
 
 # константы для почты
 SMTP_SERVER = os.environ.get("SMTP_SERVER")
-SMTP_PORT = int(os.environ.get("SMTP_PORT",587))
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
 SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD")
 RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
-TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD",28.0))
-
-# глобальные переменные
-current_temperature = 0.0
-temperature_history = deque(maxlen=100)
-time_history = deque(maxlen=100)
-monitor_active = False
-alert_sent = False
-
+TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD", 28.0))
 
 # функии для датчика
 def now_str():
@@ -109,9 +96,7 @@ def parse_data_report(payload):
 
 # функция для отправки почты
 def send_email_alert(temp):
-    global alert_sent
-
-    if alert_sent:
+    if state.alert_sent:
         return
 
     try:
@@ -135,7 +120,7 @@ def send_email_alert(temp):
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
 
-        alert_sent = True
+        state.alert_sent = True
         print(f"[{now_str()}] Письмо отправлено на {RECEIVER_EMAIL}")
 
     except Exception as e:
@@ -144,9 +129,9 @@ def send_email_alert(temp):
 
 # поток чтения для датчика
 def read_sensor_loop():
-    global current_temperature, temperature_history, time_history, monitor_active, alert_sent
 
     devices = available_devices()
+
     if not devices:
         print("Устройства не найдены")
         return
@@ -161,7 +146,7 @@ def read_sensor_loop():
     last_data_time = time.time()
     print("Мониторинг запущен")
 
-    while monitor_active:
+    while state.monitor_active:
         try:
             report = dev.read(64, 100)
             if report:
@@ -177,21 +162,21 @@ def read_sensor_loop():
                     value = parse_data_report(payload)
                     if value:
                         temp = value["temperature"]
-                        current_temperature = temp
+                        state.current_temperature = temp
 
-                        temperature_history.append(temp)
-                        time_history.append(datetime.datetime.now().strftime("%H:%M:%S"))
+                        state.temperature_history.append(temp)
+                        state.time_history.append(datetime.datetime.now().strftime("%H:%M:%S"))
 
                         if temp > TEMP_THRESHOLD:
                             print(f"[{now_str()}] ПЕРЕГРЕВ! {temp:.1f}°C")
                             send_email_alert(temp)
                         else:
-                            alert_sent = False
+                            state.alert_sent = False
 
                 elif report_id == HID_EVENT_REPORT_ID:
                     if payload:
-                        state = SENSOR_STATES.get(payload[0], f"UNKNOWN({payload[0]})")
-                        print(f"[{now_str()}] Состояние сенсора: {state}")
+                        sensor_state = SENSOR_STATES.get(payload[0], f"UNKNOWN({payload[0]})")
+                        print(f"[{now_str()}] Состояние сенсора: {sensor_state}")
 
                 elif report_id == HID_FW_REPORT_ID:
                     if payload:
@@ -214,73 +199,7 @@ def read_sensor_loop():
     print("Датчик отключен")
 
 
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass
-
-    def do_GET(self):
-        global monitor_active
-
-        if self.path == '/':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            with open("vizual.html", "r", encoding="utf-8") as f:
-                html = f.read()
-            self.wfile.write(html.encode("utf-8"))
-
-        elif self.path == '/devices':
-            devices = ["ODTEMP-1 (SN: 001) - Температура"]
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(devices).encode())
-
-        elif self.path.startswith('/start'):
-            if not monitor_active:
-                monitor_active = True
-                sensor_thread = threading.Thread(target=read_sensor_loop, daemon=True)
-                sensor_thread.start()
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'status': 'running', 'message': 'Мониторинг запущен'}).encode())
-
-        elif self.path == '/stop':
-            monitor_active = False
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({'status': 'stopped', 'message': 'Мониторинг остановлен'}).encode())
-
-        elif self.path == '/data':
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            data = {
-                'temp': current_temperature,
-                'temps': list(temperature_history),
-                'times': list(time_history)
-            }
-            self.wfile.write(json.dumps(data).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-
 # запуск
 if __name__ == "__main__":
-    PORT = 5003
-    webbrowser.open(f'http://localhost:{PORT}')
-
-    print(f"Сервер запущен на http://localhost:{PORT}")
-    print("Нажмите Ctrl+C для остановки")
-    print("Нажмите кнопку 'Запустить мониторинг' для начала сбора данных")
-
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\nОстановка...")
-            monitor_active = False
-            httpd.shutdown()
+    from web_server import start_server
+    start_server(5003)
