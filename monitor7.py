@@ -34,6 +34,7 @@ SENDER_PASSWORD = os.environ.get("SENDER_PASSWORD")
 RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
 TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD", 28.0))
 
+
 # функии для датчика
 def now_str():
     return datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
@@ -77,7 +78,7 @@ def choose_device(devices, serial_number=None, index=None):
     return devices[0]
 
 
-def open_device(device_info):
+def open_device():
     try:
         dev = hid.Device(vid=OD_VID, pid=OD_IOT_PID)
         return dev
@@ -138,7 +139,7 @@ def read_sensor_loop():
 
     device_info = choose_device(devices)
     print(f"Открываем устройство: {device_info['device_type']}")
-    dev = open_device(device_info)
+    dev = open_device()
     if not dev:
         print("Не удалось открыть устройство")
         return
