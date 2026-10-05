@@ -60,7 +60,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 def open_browser(port):
     webbrowser.open(f'http://localhost:{port}')
-    
+
 
 def start_server(port=5003):
     logger.info(f"Сервер запущен на http://localhost:{port}")
