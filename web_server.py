@@ -21,7 +21,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(html.encode("utf-8"))
 
         elif self.path == '/devices':
-            devices = ["ODTEMP-1 (SN: 001) - Температура"]
+            devices = ["ODTEMP-1 (SN: 001) - Temperature"]
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
@@ -35,14 +35,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({'status': 'running', 'message': 'Мониторинг запущен'}).encode())
+            self.wfile.write(json.dumps({'status': 'running', 'message': 'Monitoring started'}).encode())
 
         elif self.path == '/stop':
             state.monitor_active = False
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({'status': 'stopped', 'message': 'Мониторинг остановлен'}).encode())
+            self.wfile.write(json.dumps({'status': 'stopped', 'message': 'Monitoring stopped'}).encode())
 
         elif self.path == '/data':
             self.send_response(200)
@@ -63,9 +63,9 @@ def open_browser(port):
 
 
 def start_server(port=5003):
-    logger.info(f"Сервер запущен на http://localhost:{port}")
-    logger.info("Нажмите Ctrl+C для остановки")
-    logger.info("Нажмите кнопку 'Запустить мониторинг' для начала сбора данных")
+    logger.info(f"Server started at http://localhost:{port}")
+    logger.info("Press Ctrl+C to stop")
+    logger.info("Press the 'Start Monitoring' button to begin data collection")
 
     threading.Timer(1.0, open_browser, args=[port]).start()
 
@@ -73,6 +73,6 @@ def start_server(port=5003):
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
-            logger.info("Остановка...")
+            logger.info("Stopping...")
             state.monitor_active = False
             httpd.shutdown()
