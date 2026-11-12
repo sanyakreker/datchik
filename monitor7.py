@@ -37,7 +37,7 @@ RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
 TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD", 28.0))
 
 
-# funstions for sensor
+# functions for sensor
 def now_str():
     return datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
@@ -85,7 +85,7 @@ def open_device():
         dev = hid.Device(vid=OD_VID, pid=OD_IOT_PID)
         return dev
     except Exception as e:
-        logger.error(f"Ошибка открытия устройства: {e}")
+        logger.error(f"Device open error: {e}")
         return None
 
 
@@ -106,15 +106,15 @@ def send_email_alert(temp):
         msg = MIMEMultipart()
         msg["From"] = SENDER_EMAIL
         msg["To"] = RECEIVER_EMAIL
-        msg["Subject"] = f"ПРЕДУПРЕЖДЕНИЕ: Перегрев! {temp:.1f}°C"
+        msg["Subject"] = f"WARNING: Overheating! {temp:.1f}°C"
 
-        body = f"""ВНИМАНИЕ! Зафиксирован перегрев!
+        body = f"""ATTENTION! Overheating detected!
 
-Температура: {temp:.1f}°C
-Время: {now_str()}
-Порог: {TEMP_THRESHOLD}°C
+Temperature: {temp:.1f}°C
+Time: {now_str()}
+Threshold: {TEMP_THRESHOLD}°C
 
-Пожалуйста, примите меры немедленно!
+Please take action immediately!
 """
         msg.attach(MIMEText(body, "plain"))
 
@@ -124,10 +124,10 @@ def send_email_alert(temp):
             server.send_message(msg)
 
         state.alert_sent = True
-        logger.info(f"Письмо отправлено на {RECEIVER_EMAIL}")
+        logger.info(f"Email sent to {RECEIVER_EMAIL}")
 
     except Exception as e:
-        logger.error(f"Ошибка отправки письма: {e}")
+        logger.error(f"Email sending error: {e}")
 
 
 # read stream for a sensor
@@ -136,18 +136,18 @@ def read_sensor_loop():
     devices = available_devices()
 
     if not devices:
-        logger.warning("Устройства не найдены")
+        logger.warning("No devices found")
         return
 
     device_info = choose_device(devices)
-    logger.info(f"Открываем устройство: {device_info['device_type']}")
+    logger.info(f"Opening device: {device_info['device_type']}")
     dev = open_device()
     if not dev:
-        logger.error("Не удалось открыть устройство")
+        logger.error("Failed to open device")
         return
 
     last_data_time = time.time()
-    logger.info("Мониторинг запущен")
+    logger.info("Monitoring started")
 
     while state.monitor_active:
         try:
@@ -172,7 +172,7 @@ def read_sensor_loop():
                         database.log_temperature(temp)
 
                         if temp > TEMP_THRESHOLD:
-                            logger.warning(f"ПЕРЕГРЕВ! {temp:.1f}°C")
+                            logger.warning(f"OVERHEATING! {temp:.1f}°C")
                             send_email_alert(temp)
                         else:
                             state.alert_sent = False
@@ -180,28 +180,27 @@ def read_sensor_loop():
                 elif report_id == HID_EVENT_REPORT_ID:
                     if payload:
                         sensor_state = SENSOR_STATES.get(payload[0], f"UNKNOWN({payload[0]})")
-                        logger.info(f"Состояние сенсора: {sensor_state}")
+                        logger.info(f"Sensor state: {sensor_state}")
 
                 elif report_id == HID_FW_REPORT_ID:
                     if payload:
                         length = payload[0]
                         fw = payload[1:1 + length].decode("latin1", errors="replace")
-                        logger.info(f"Версия прошивки: {fw}")
+                        logger.info(f"Firmware version: {fw}")
 
             if (time.time() - last_data_time) > 10.0:
-                logger.error("Устройство не отвечает более 10 секунд")
+                logger.error("Device not responding for more than 10 seconds")
                 break
 
         except IOError as e:
-            logger.error(f"Ошибка чтения: {e}")
+            logger.error(f"Read error: {e}")
             time.sleep(0.5)
         except Exception as e:
-            logger.error(f"Ошибка: {e}")
+            logger.error(f"Error: {e}")
             time.sleep(0.5)
 
     dev.close()
-    logger.info("Датчик отключен")
-
+    logger.info("Sensor disconnected")
 
 # start
 if __name__ == "__main__":
