@@ -11,7 +11,7 @@ import state
 import database
 from logger import logger
 
-# константы_для_датчика
+# constants for sensor
 OD_VID = 0x0483
 OD_IOT_PID = 0xA26A
 HID_DATA_REPORT_ID = 1
@@ -28,7 +28,7 @@ SENSOR_STATES = {
 }
 load_dotenv("data.env")
 
-# константы для почты
+# constants for mail
 SMTP_SERVER = os.environ.get("SMTP_SERVER")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL")
@@ -37,7 +37,7 @@ RECEIVER_EMAIL = os.environ.get("RECEIVER_EMAIL")
 TEMP_THRESHOLD = float(os.environ.get("TEMP_THRESHOLD", 28.0))
 
 
-# функии для датчика
+# funstions for sensor
 def now_str():
     return datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
 
@@ -97,7 +97,7 @@ def parse_data_report(payload):
     return {"temperature": temp}
 
 
-# функция для отправки почты
+# function for sending mail
 def send_email_alert(temp):
     if state.alert_sent:
         return
@@ -130,7 +130,7 @@ def send_email_alert(temp):
         logger.error(f"Ошибка отправки письма: {e}")
 
 
-# поток чтения для датчика
+# read stream for a sensor
 def read_sensor_loop():
 
     devices = available_devices()
@@ -203,7 +203,7 @@ def read_sensor_loop():
     logger.info("Датчик отключен")
 
 
-# запуск
+# start
 if __name__ == "__main__":
     database.init_db()
     from web_server import start_server
